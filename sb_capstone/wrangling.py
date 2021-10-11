@@ -16,3 +16,10 @@ def clean_profile(profile):
     profile.became_member_on = pd.to_datetime(profile.became_member_on)
 
     return profile
+
+EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'transaction', 'offer_completed'])
+
+def clean_transcript(transcript):
+    transcript.event = transcript.event.astype(EventType)
+
+    return transcript
