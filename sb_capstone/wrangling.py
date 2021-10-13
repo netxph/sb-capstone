@@ -18,8 +18,13 @@ def clean_profile(profile):
     return profile
 
 EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'transaction', 'offer_completed'])
+OfferIDType = pd.CategoricalDtype(categories=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
 
 def clean_transcript(transcript):
     transcript.event = transcript.event.astype(EventType)
+
+    # offer_id does not make sense as numerical, let's convert it to categorical.
+    transcript.offer_id = transcript.offer_id.astype(OfferIDType)
 
     return transcript
