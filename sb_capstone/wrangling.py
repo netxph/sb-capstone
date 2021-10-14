@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 OfferType = pd.CategoricalDtype(categories=['bogo', 'informational', 'discount'])
 ChannelType = pd.CategoricalDtype(categories=['email', 'mobile', 'social', 'web'])
@@ -28,3 +29,15 @@ def clean_transcript(transcript):
     transcript.offer_id = transcript.offer_id.astype(OfferIDType)
 
     return transcript
+
+def s3_remove_outliers(data):
+    # 3 sigma technique
+
+    outliers = {}
+    for col in data.columns:
+        if (str(data[col].dtype) != 'object') and (str(data[col].dtype) != 'category'):
+            data = data[np.abs(data[col] - data[col].mean()) < (3 * data[col].std())]
+            olrs = data[~(np.abs(data[col] - data[col].mean()) < (3 * data[col].std()))]
+            outliers = pd.DataFrame(olrs)
+
+    return data, outliers
