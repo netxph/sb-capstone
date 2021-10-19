@@ -57,3 +57,28 @@ def _map_event_to_desc(event_seq):
         return "failed"
     else:
         return None
+
+def get_transcript_active(transcript_portfolio):
+    transcript_active = transcript_portfolio.groupby("person_id").apply(_get_active_offers)
+    transcript_active.active_offers = transcript_active.active_offers.apply(lambda x: x if len(x) > 0 else None)
+
+    return transcript_active
+
+def _get_active_offers(user_portfolio_group):
+    user_portfolio_group["active_offers"] = None
+    index = 0
+    offers = {}
+
+    for i, row in user_portfolio_group.iterrows():
+        if row.event == "offer_received":
+            offers[index] = (row.offer_id, row.time + (row.duration * 24))
+            index = index + 1
+
+        for j in list(offers.keys()):
+            if row.time > offers[j][1]:
+                del offers[j]
+
+        user_portfolio_group.at[i, "active_offers"] = [o[0] for o in list(offers.values())]
+
+    return user_portfolio_group
+
