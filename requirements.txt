@@ -1,7 +1,8 @@
 pandas
 numpy
 jupyterlab
-sklearn
+scikit-learn
+scikit-learn-intelex
 autopep8
 matplotlib
 seaborn
