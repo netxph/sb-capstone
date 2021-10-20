@@ -41,3 +41,14 @@ def s3_remove_outliers(data):
             outliers = pd.DataFrame(olrs)
 
     return data, outliers
+
+def tukey_rule(data, col):
+    Q1 = data[col].quantile(0.25)
+    Q3 = data[col].quantile(0.75)
+    
+    IQR = Q3 - Q1
+    
+    max_value = Q3 + (1.5 * IQR)
+    min_value = Q1 - (1.5 * IQR)
+    
+    return data[(data[col] >= min_value) & (data[col] <= max_value)]
