@@ -6,3 +6,5 @@ scikit-learn-intelex
 autopep8
 matplotlib
 seaborn
+tqdm
+ipywidgets
