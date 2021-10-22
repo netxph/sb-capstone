@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 class OfferGroup():
 
     def __init__(self, row):
@@ -34,7 +37,7 @@ class OfferGroups():
 
     def get_group(self, row):
         # there should have only one unique event per group
-        result = 0, 0
+        result = -row.wave, 0
 
         for idx  in self._groups:
             group = self._groups[idx]
@@ -47,6 +50,7 @@ class OfferGroups():
 
     def add_group(self, row):
         # create a new group, initializing all variables
+
         for g in self._groups:
             self._groups[g].deactivate()
 
@@ -54,7 +58,8 @@ class OfferGroups():
         self._groups[self._index] = OfferGroup(row)
 
 
-def get_transcript_group(transcript):
+def get_transcript_combined(transcript):
+    transcript["wave"] = pd.cut(transcript.time, bins=[-1, 167, 335, 407, 503, 575, 714], labels=np.arange(1,7))
     return transcript.groupby("person_id").apply(_get_offer_group)
 
 def _get_offer_group(user_group):
@@ -70,3 +75,30 @@ def _get_offer_group(user_group):
         user_group.loc[i, "offer_id"] = offer_id
 
     return user_group
+
+def get_transcript_group(transcript):
+    transcript_group = transcript \
+        .sort_values(by=["person_id", "time", "event"]) \
+        .groupby(["person_id", "offer_group"]) \
+        .agg({
+            "event": lambda x: x.tolist(), 
+            "offer_id": "min", 
+            "amount": "sum", 
+            "reward": "max", 
+            "offer_type": "first", 
+            "channels": "first",
+            "offer_reward": "max",
+            "difficulty": "max",
+            "duration": "max",
+            "wave": "max"
+            }) \
+        .reset_index()
+
+    mask = transcript_group.event.apply(lambda x: "transaction" in x)
+
+    transcript_group.loc[(transcript_group.offer_type == "informational") & mask, "event"] = \
+        transcript_group[(transcript_group.offer_type == "informational") & mask] \
+            .event  \
+            .apply(lambda x: [e if e != "transaction" else "offer_completed" for e in x])
+
+    return transcript_group
