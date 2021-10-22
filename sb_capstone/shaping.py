@@ -7,14 +7,14 @@ class OfferGroup():
         self.events = []
         self.difficulty = row.difficulty
         self.redeemed = False
+        self.active = True
 
     def can_add_event(self, row):
         if row.event != "transaction":
             return (row.offer_id == self.offer_id) and  \
-                (not row.event in self.events) and \
-                    (row.time <= self.expires)
+                (not row.event in self.events)
         else:
-            return (row.time <= self.expires) and (not self.redeemed)
+            return (row.time <= self.expires) and (not self.redeemed) and (self.active)
 
     def add_event(self, row):
         if row.event != "transaction":
@@ -22,6 +22,9 @@ class OfferGroup():
         else:
             self.difficulty = self.difficulty - row.amount
             self.redeemed = self.difficulty <= 0.0
+
+    def deactivate(self):
+        self.active = False
 
 class OfferGroups():
 
@@ -44,6 +47,9 @@ class OfferGroups():
 
     def add_group(self, row):
         # create a new group, initializing all variables
+        for g in self._groups:
+            self._groups[g].deactivate()
+
         self._index = self._index + 1
         self._groups[self._index] = OfferGroup(row)
 
