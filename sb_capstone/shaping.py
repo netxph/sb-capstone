@@ -1,84 +1,66 @@
+class OfferGroup():
+
+    def __init__(self, row):
+        self.offer_id = row.offer_id
+        self.offer_type = row.offer_type
+        self.expires = (row.duration * 24) + row.time
+        self.events = []
+        self.difficulty = row.difficulty
+        self.redeemed = False
+
+    def can_add_event(self, row):
+        if row.event != "transaction":
+            return (row.offer_id == self.offer_id) and  \
+                (not row.event in self.events) and \
+                    (row.time <= self.expires)
+        else:
+            return (row.time <= self.expires) and (not self.redeemed)
+
+    def add_event(self, row):
+        if row.event != "transaction":
+            self.events.append(row.event)
+        else:
+            self.difficulty = self.difficulty - row.amount
+            self.redeemed = self.difficulty <= 0.0
+
+class OfferGroups():
+
+    def __init__(self):
+        self._groups = {}
+        self._index = 0
+
+    def get_group(self, row):
+        # there should have only one unique event per group
+        result = 0, 0
+
+        for idx  in self._groups:
+            group = self._groups[idx]
+            if group.can_add_event(row):
+                group.add_event(row)
+                result = idx, group.offer_id
+                break
+        
+        return result
+
+    def add_group(self, row):
+        # create a new group, initializing all variables
+        self._index = self._index + 1
+        self._groups[self._index] = OfferGroup(row)
+
+
 def get_transcript_group(transcript):
     return transcript.groupby("person_id").apply(_get_offer_group)
 
 def _get_offer_group(user_group):
-    offer_groups = {}
-    offer_idx = 0
+    offer_groups = OfferGroups()
 
     for i, row in user_group.iterrows():
         if row.event == "offer_received":
-            offer_idx = offer_idx + 1
-            group_id = f"{offer_idx}:{row.offer_id}"
+            offer_groups.add_group(row)
 
-            offer_groups[group_id] = [row.event]
-            user_group.loc[i, "offer_group"] = offer_idx
+        group_id, offer_id = offer_groups.get_group(row)
 
-        elif row.event in ["offer_viewed", "offer_completed"]:
-            idx, group_id = _find_offer_index(offer_groups, row.event, row.offer_id)
-
-            offer_groups[group_id].append(row.event)
-            user_group.loc[i, "offer_group"] = idx
-        else:
-            user_group.loc[i, "offer_group"] = 0
+        user_group.loc[i, "offer_group"] = group_id
+        user_group.loc[i, "offer_id"] = offer_id
 
     return user_group
-
-def _find_offer_index(offer_groups, event, offer_id):
-    for group_id in offer_groups:
-        idx, id = group_id.split(":")
-
-        if (int(id) == offer_id) and (event not in offer_groups[group_id]):
-            return int(idx), group_id
-
-    return 0, None
-
-def get_transcript_sequence(transcript_group):
-    transcript_seq = transcript_group[transcript_group.event != "transaction"] \
-        .groupby(["person_id","offer_group"]) \
-        .agg({"event": lambda x: x.tolist(), "offer_id": lambda x: x.iloc[0]}) \
-        .reset_index()
-    
-    transcript_seq["offer_success"] = transcript_seq.event.apply(_map_event_to_desc)
-    transcript_seq["completed"] = transcript_seq.event.apply(lambda x: "offer_completed" in x)
-    transcript_seq["success"] = transcript_seq.offer_success.apply(lambda x: x == "success")
-
-    return transcript_seq
-
-def _map_event_to_desc(event_seq):
-    seq = ",".join(event_seq)
-
-    if seq == "offer_received,offer_viewed,offer_completed":
-        return "success"
-    elif seq == "offer_received,offer_viewed":
-        return "failed_viewed"
-    elif (seq == "offer_received,offer_completed") or (seq == "offer_received,offer_completed,offer_viewed"):
-        return "success_without_offer"
-    elif seq == "offer_received":
-        return "failed"
-    else:
-        return None
-
-def get_transcript_active(transcript_portfolio):
-    transcript_active = transcript_portfolio.groupby("person_id").apply(_get_active_offers)
-    transcript_active.active_offers = transcript_active.active_offers.apply(lambda x: x if len(x) > 0 else None)
-
-    return transcript_active
-
-def _get_active_offers(user_portfolio_group):
-    user_portfolio_group["active_offers"] = None
-    index = 0
-    offers = {}
-
-    for i, row in user_portfolio_group.iterrows():
-        if row.event == "offer_received":
-            offers[index] = (row.offer_id, row.time + (row.duration * 24))
-            index = index + 1
-
-        for j in list(offers.keys()):
-            if row.time > offers[j][1]:
-                del offers[j]
-
-        user_portfolio_group.at[i, "active_offers"] = [o[0] for o in list(offers.values())]
-
-    return user_portfolio_group
-

@@ -18,7 +18,7 @@ def clean_profile(profile):
 
     return profile
 
-EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'transaction', 'offer_completed'])
+EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'offer_completed', 'transaction'], ordered=True)
 OfferIDType = pd.CategoricalDtype(categories=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
 
