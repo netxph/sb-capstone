@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-OfferType = pd.CategoricalDtype(categories=['bogo', 'informational', 'discount'])
+OfferType = pd.CategoricalDtype(categories=['bogo', 'informational', 'discount', "no_offer"])
 ChannelType = pd.CategoricalDtype(categories=['email', 'mobile', 'social', 'web'])
 
 def clean_portfolio(portfolio):
@@ -10,7 +10,7 @@ def clean_portfolio(portfolio):
 
     return portfolio
 
-GenderType = pd.CategoricalDtype(categories=['F', 'M', 'O'])
+GenderType = pd.CategoricalDtype(categories=['F', 'M', 'O', 'U'])
 
 def clean_profile(profile):
     profile.gender = profile.gender.astype(GenderType)    

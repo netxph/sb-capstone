@@ -86,7 +86,7 @@ def get_transcript_group(transcript, profile):
         .groupby(["person_id", "offer_group"]) \
         .agg({
             "event": lambda x: x.tolist(), 
-            "mapped_offer": "min", 
+            "mapped_offer": "max", 
             "amount": "sum", 
             "reward": "max", 
             "offer_type": "first", 
@@ -133,5 +133,59 @@ def get_transcript_group(transcript, profile):
             left_on=["id", "wave"], 
             right_on=["person_id", "wave"], 
             how="left")
+    
+    transcript_group["received"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: x[0] == "offer_received" if len(x) > 0 else False)
+    transcript_group["viewed"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: x[1] == "offer_viewed" if len(x) > 1 else False)
+    transcript_group["completed"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: (x[2] == "offer_completed" or x[1] == "offer_completed") if len(x) > 2 else False)
+
+    transcript_group \
+        .loc[~transcript_group.channels.isna(), ["web", "email", "mobile", "social"]] =  \
+            transcript_group \
+                .loc[~transcript_group.channels.isna()] \
+                .channels \
+                .apply(lambda x: pd.Series([1] * len(x), index=x)) \
+                .fillna(0, downcast='infer')
+
+    transcript_group.amount = transcript_group.amount.fillna(0)
+    transcript_group.reward = transcript_group.reward.fillna(0)
+    transcript_group.non_offer_amount = transcript_group.non_offer_amount.fillna(0)
+    transcript_group.mapped_offer = transcript_group.mapped_offer.fillna(0).astype(int)
+    transcript_group.difficulty = transcript_group.difficulty.fillna(0)
+    transcript_group.duration = transcript_group.duration.fillna(0)
+    transcript_group.web = transcript_group.web.fillna(0).astype(bool)
+    transcript_group.email = transcript_group.email.fillna(0).astype(bool)
+    transcript_group.mobile = transcript_group.mobile.fillna(0).astype(bool)
+    transcript_group.social = transcript_group.social.fillna(0).astype(bool)
+    transcript_group.gender = transcript_group.gender.fillna("U")
+    transcript_group.offer_type = transcript_group.offer_type.fillna("no_offer")
+    
+    transcript_group = transcript_group[[
+        "id",
+        "wave",
+        "received",
+        "viewed", 
+        "completed",
+        "amount",
+        "reward",
+        "non_offer_amount",
+        "mapped_offer",
+        "offer_type",
+        "difficulty",
+        "duration",
+        "web", 
+        "email",
+        "mobile",
+        "social",
+        "gender",
+        "age",
+        "income",
+        "became_member_on"
+    ]]
 
     return transcript_group
