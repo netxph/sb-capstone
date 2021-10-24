@@ -60,6 +60,7 @@ class OfferGroups():
 
 def get_transcript_combined(transcript):
     transcript["wave"] = pd.cut(transcript.time, bins=[-1, 167, 335, 407, 503, 575, 714], labels=np.arange(1,7))
+    transcript["day"] = pd.cut(transcript.time, bins=np.arange(-1, 714 + 24, step=24), labels=np.arange(1, 30 + 1))
     return transcript.groupby("person_id").apply(_get_offer_group)
 
 def _get_offer_group(user_group):
@@ -90,7 +91,7 @@ def get_transcript_group(transcript):
             "offer_reward": "max",
             "difficulty": "max",
             "duration": "max",
-            "wave": "max"
+            "wave": "min"
             }) \
         .reset_index()
 
@@ -100,5 +101,12 @@ def get_transcript_group(transcript):
         transcript_group[(transcript_group.offer_type == "informational") & mask] \
             .event  \
             .apply(lambda x: [e if e != "transaction" else "offer_completed" for e in x])
+
+    transcript_non_offer = transcript_group[transcript_group.offer_group < 0][["person_id", "wave", "amount"]].reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
+    transcript_offer = transcript_group[transcript_group.offer_group > 0].reset_index(drop=True)
+
+    transcript_group = transcript_offer.merge(transcript_non_offer, on=["person_id", "wave"], how="left")
+
+    transcript_group.event = transcript_group.event.apply(lambda x: list(filter(lambda a: a != "transaction", x)))
 
     return transcript_group
