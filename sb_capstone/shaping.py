@@ -61,6 +61,9 @@ class OfferGroups():
 def get_transcript_combined(transcript):
     transcript["wave"] = pd.cut(transcript.time, bins=[-1, 167, 335, 407, 503, 575, 714], labels=np.arange(1,7))
     transcript["day"] = pd.cut(transcript.time, bins=np.arange(-1, 714 + 24, step=24), labels=np.arange(1, 30 + 1))
+
+    transcript = transcript.rename(columns={"offer_id": "mapped_offer", "id": "offer_id"})
+
     return transcript.groupby("person_id").apply(_get_offer_group)
 
 def _get_offer_group(user_group):
@@ -77,13 +80,13 @@ def _get_offer_group(user_group):
 
     return user_group
 
-def get_transcript_group(transcript):
+def get_transcript_group(transcript, profile):
     transcript_group = transcript \
         .sort_values(by=["person_id", "time", "event"]) \
         .groupby(["person_id", "offer_group"]) \
         .agg({
             "event": lambda x: x.tolist(), 
-            "offer_id": "min", 
+            "mapped_offer": "min", 
             "amount": "sum", 
             "reward": "max", 
             "offer_type": "first", 
@@ -95,18 +98,40 @@ def get_transcript_group(transcript):
             }) \
         .reset_index()
 
-    mask = transcript_group.event.apply(lambda x: "transaction" in x)
+    mask = transcript_group.event.fillna("").apply(lambda x: "transaction" in x)
 
     transcript_group.loc[(transcript_group.offer_type == "informational") & mask, "event"] = \
         transcript_group[(transcript_group.offer_type == "informational") & mask] \
             .event  \
             .apply(lambda x: [e if e != "transaction" else "offer_completed" for e in x])
 
-    transcript_non_offer = transcript_group[transcript_group.offer_group < 0][["person_id", "wave", "amount"]].reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
-    transcript_offer = transcript_group[transcript_group.offer_group > 0].reset_index(drop=True)
+    transcript_non_offer = transcript_group[transcript_group.offer_group < 0] \
+        [["person_id", "wave", "amount"]]   \
+            .reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
 
-    transcript_group = transcript_offer.merge(transcript_non_offer, on=["person_id", "wave"], how="left")
+    transcript_offer = transcript_group[transcript_group.offer_group > 0] \
+        .reset_index(drop=True)
 
-    transcript_group.event = transcript_group.event.apply(lambda x: list(filter(lambda a: a != "transaction", x)))
+    transcript_group = transcript_offer \
+        .merge(transcript_non_offer, on=["person_id", "wave"], how="left")
+
+    transcript_group.event = transcript_group.event \
+        .apply(lambda x: list(filter(lambda a: a != "transaction", x)))
+
+    waves = []
+
+    for i in transcript_group.wave.unique():
+        wave = profile.copy()
+        wave["wave"] = i
+        waves.append(wave)
+
+    profile_wave = pd.concat(waves)
+
+    transcript_group = profile_wave \
+        .merge( \
+            transcript_group,  
+            left_on=["id", "wave"], 
+            right_on=["person_id", "wave"], 
+            how="left")
 
     return transcript_group
