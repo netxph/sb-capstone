@@ -30,18 +30,6 @@ def clean_transcript(transcript):
 
     return transcript
 
-def s3_remove_outliers(data):
-    # 3 sigma technique
-
-    outliers = {}
-    for col in data.columns:
-        if (str(data[col].dtype) != 'object') and (str(data[col].dtype) != 'category'):
-            data = data[np.abs(data[col] - data[col].mean()) < (3 * data[col].std())]
-            olrs = data[~(np.abs(data[col] - data[col].mean()) < (3 * data[col].std()))]
-            outliers = pd.DataFrame(olrs)
-
-    return data, outliers
-
 def tukey_rule(data, col):
     Q1 = data[col].quantile(0.25)
     Q3 = data[col].quantile(0.75)

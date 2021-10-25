@@ -80,6 +80,95 @@ def _get_offer_group(user_group):
 
     return user_group
 
+def _mark_information_completed(transcript_group):
+    mask = transcript_group.event.fillna("").apply(lambda x: "transaction" in x)
+
+    transcript_group.loc[(transcript_group.offer_type == "informational") & mask, "event"] = \
+        transcript_group[(transcript_group.offer_type == "informational") & mask] \
+            .event  \
+            .apply(lambda x: [e if e != "transaction" else "offer_completed" for e in x])
+
+    return transcript_group
+
+def _get_non_offer_amount(transcript_group):
+    transcript_non_offer = transcript_group[transcript_group.offer_group < 0] \
+        [["person_id", "wave", "amount"]]   \
+            .reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
+
+    transcript_offer = transcript_group[transcript_group.offer_group > 0] \
+        .reset_index(drop=True)
+
+    transcript_group = transcript_offer \
+        .merge(transcript_non_offer, on=["person_id", "wave"], how="left")
+
+    return transcript_group
+
+def _add_profiles_with_notrans(transcript_group, profile):
+    waves = []
+
+    for i in transcript_group.wave.unique():
+        wave = profile.copy()
+        wave["wave"] = i
+        waves.append(wave)
+
+    profile_wave = pd.concat(waves)
+
+    transcript_group = profile_wave \
+        .merge( \
+            transcript_group,  
+            left_on=["id", "wave"], 
+            right_on=["person_id", "wave"], 
+            how="left")
+
+    return transcript_group
+
+def _promote_events_to_columns(transcript_group):
+    transcript_group["received"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: x[0] == "offer_received" if len(x) > 0 else False)
+    transcript_group["viewed"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: x[1] == "offer_viewed" if len(x) > 1 else False)
+    transcript_group["completed"] = transcript_group.event \
+        .fillna("") \
+        .apply(lambda x: (x[2] == "offer_completed" or x[1] == "offer_completed") if len(x) > 2 else False)
+
+    return transcript_group
+
+def _promote_channels_to_columns(transcript_group):
+    transcript_group \
+        .loc[~transcript_group.channels.isna(), ["web", "email", "mobile", "social"]] =  \
+            transcript_group \
+                .loc[~transcript_group.channels.isna()] \
+                .channels \
+                .apply(lambda x: pd.Series([1] * len(x), index=x)) \
+                .fillna(0, downcast='infer')
+
+    return transcript_group
+
+def _impute_missing_values(transcript_group):
+    transcript_group.amount = transcript_group.amount.fillna(0)
+    transcript_group.reward = transcript_group.reward.fillna(0)
+    transcript_group.non_offer_amount = transcript_group.non_offer_amount.fillna(0)
+    transcript_group.mapped_offer = transcript_group.mapped_offer.fillna(0).astype(int)
+    transcript_group.difficulty = transcript_group.difficulty.fillna(0)
+    transcript_group.duration = transcript_group.duration.fillna(0)
+    transcript_group.web = transcript_group.web.fillna(0).astype(bool)
+    transcript_group.email = transcript_group.email.fillna(0).astype(bool)
+    transcript_group.mobile = transcript_group.mobile.fillna(0).astype(bool)
+    transcript_group.social = transcript_group.social.fillna(0).astype(bool)
+    transcript_group.gender = transcript_group.gender.fillna("U")
+    transcript_group.offer_type = transcript_group.offer_type.fillna("no_offer")
+
+    return transcript_group
+
+def _remove_transaction_in_event(transcript_group):
+
+    transcript_group.event = transcript_group.event \
+        .apply(lambda x: list(filter(lambda a: a != "transaction", x)))
+
+    return transcript_group
+
 def get_transcript_group(transcript, profile):
     transcript_group = transcript \
         .sort_values(by=["person_id", "time", "event"]) \
@@ -98,72 +187,15 @@ def get_transcript_group(transcript, profile):
             }) \
         .reset_index()
 
-    mask = transcript_group.event.fillna("").apply(lambda x: "transaction" in x)
+    transcript_group = \
+        _impute_missing_values(
+            _promote_channels_to_columns(
+                _promote_events_to_columns(
+                    _add_profiles_with_notrans( \
+                        _remove_transaction_in_event( \
+                            _get_non_offer_amount( \
+                                _mark_information_completed(transcript_group))), profile))))
 
-    transcript_group.loc[(transcript_group.offer_type == "informational") & mask, "event"] = \
-        transcript_group[(transcript_group.offer_type == "informational") & mask] \
-            .event  \
-            .apply(lambda x: [e if e != "transaction" else "offer_completed" for e in x])
-
-    transcript_non_offer = transcript_group[transcript_group.offer_group < 0] \
-        [["person_id", "wave", "amount"]]   \
-            .reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
-
-    transcript_offer = transcript_group[transcript_group.offer_group > 0] \
-        .reset_index(drop=True)
-
-    transcript_group = transcript_offer \
-        .merge(transcript_non_offer, on=["person_id", "wave"], how="left")
-
-    transcript_group.event = transcript_group.event \
-        .apply(lambda x: list(filter(lambda a: a != "transaction", x)))
-
-    waves = []
-
-    for i in transcript_group.wave.unique():
-        wave = profile.copy()
-        wave["wave"] = i
-        waves.append(wave)
-
-    profile_wave = pd.concat(waves)
-
-    transcript_group = profile_wave \
-        .merge( \
-            transcript_group,  
-            left_on=["id", "wave"], 
-            right_on=["person_id", "wave"], 
-            how="left")
-    
-    transcript_group["received"] = transcript_group.event \
-        .fillna("") \
-        .apply(lambda x: x[0] == "offer_received" if len(x) > 0 else False)
-    transcript_group["viewed"] = transcript_group.event \
-        .fillna("") \
-        .apply(lambda x: x[1] == "offer_viewed" if len(x) > 1 else False)
-    transcript_group["completed"] = transcript_group.event \
-        .fillna("") \
-        .apply(lambda x: (x[2] == "offer_completed" or x[1] == "offer_completed") if len(x) > 2 else False)
-
-    transcript_group \
-        .loc[~transcript_group.channels.isna(), ["web", "email", "mobile", "social"]] =  \
-            transcript_group \
-                .loc[~transcript_group.channels.isna()] \
-                .channels \
-                .apply(lambda x: pd.Series([1] * len(x), index=x)) \
-                .fillna(0, downcast='infer')
-
-    transcript_group.amount = transcript_group.amount.fillna(0)
-    transcript_group.reward = transcript_group.reward.fillna(0)
-    transcript_group.non_offer_amount = transcript_group.non_offer_amount.fillna(0)
-    transcript_group.mapped_offer = transcript_group.mapped_offer.fillna(0).astype(int)
-    transcript_group.difficulty = transcript_group.difficulty.fillna(0)
-    transcript_group.duration = transcript_group.duration.fillna(0)
-    transcript_group.web = transcript_group.web.fillna(0).astype(bool)
-    transcript_group.email = transcript_group.email.fillna(0).astype(bool)
-    transcript_group.mobile = transcript_group.mobile.fillna(0).astype(bool)
-    transcript_group.social = transcript_group.social.fillna(0).astype(bool)
-    transcript_group.gender = transcript_group.gender.fillna("U")
-    transcript_group.offer_type = transcript_group.offer_type.fillna("no_offer")
     
     transcript_group = transcript_group[[
         "id",
