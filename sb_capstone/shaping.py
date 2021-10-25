@@ -169,6 +169,15 @@ def _remove_transaction_in_event(transcript_group):
 
     return transcript_group
 
+def _explode_membership_date(transcript_group):
+    transcript_group["membership_year"] = transcript_group.became_member_on.dt.year
+    transcript_group["membership_month"] = transcript_group.became_member_on.dt.month
+    transcript_group["membership_day"] = transcript_group.became_member_on.dt.day
+
+    transcript_group = transcript_group.drop(columns=["became_member_on"])
+
+    return transcript_group
+
 def get_transcript_group(transcript, profile):
     transcript_group = transcript \
         .sort_values(by=["person_id", "time", "event"]) \
@@ -191,10 +200,11 @@ def get_transcript_group(transcript, profile):
         _impute_missing_values(
             _promote_channels_to_columns(
                 _promote_events_to_columns(
-                    _add_profiles_with_notrans( \
-                        _remove_transaction_in_event( \
-                            _get_non_offer_amount( \
-                                _mark_information_completed(transcript_group))), profile))))
+                    _explode_membership_date(
+                        _add_profiles_with_notrans( \
+                            _remove_transaction_in_event( \
+                                _get_non_offer_amount( \
+                                    _mark_information_completed(transcript_group))), profile)))))
 
     
     transcript_group = transcript_group[[
@@ -217,7 +227,9 @@ def get_transcript_group(transcript, profile):
         "gender",
         "age",
         "income",
-        "became_member_on"
+        "membership_year",
+        "membership_month",
+        "membership_day"
     ]]
 
     return transcript_group

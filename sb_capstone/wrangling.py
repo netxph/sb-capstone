@@ -30,6 +30,13 @@ def clean_transcript(transcript):
 
     return transcript
 
+def clean_transcript_group(transcript_group):
+    transcript_group.mapped_offer = transcript_group.mapped_offer.astype(OfferIDType)
+    transcript_group.offer_type = transcript_group.offer_type.astype(OfferType)
+    transcript_group.gender = transcript_group.gender.astype(GenderType)
+
+    return transcript_group
+
 def tukey_rule(data, col):
     Q1 = data[col].quantile(0.25)
     Q3 = data[col].quantile(0.75)
