@@ -99,7 +99,10 @@ def _get_non_offer_amount(transcript_group):
         .reset_index(drop=True)
 
     transcript_group = transcript_offer \
-        .merge(transcript_non_offer, on=["person_id", "wave"], how="left")
+        .merge(transcript_non_offer, on=["person_id", "wave"], how="outer")
+
+    transcript_group.event = transcript_group.event.apply(lambda x: [] if x is np.NaN else x)
+    transcript_group.channels = transcript_group.channels.apply(lambda x: [] if x is np.NaN else x)
 
     return transcript_group
 
@@ -165,7 +168,7 @@ def _impute_missing_values(transcript_group):
 def _remove_transaction_in_event(transcript_group):
 
     transcript_group.event = transcript_group.event \
-        .apply(lambda x: list(filter(lambda a: a != "transaction", x)))
+        .apply(lambda x: list(filter(lambda a: a != "transaction", x)) if x != np.NaN else [])
 
     return transcript_group
 
