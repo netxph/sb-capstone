@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 
+from sb_capstone.wrangling import (
+    tukey_rule 
+)
+
 class OfferGroup():
 
     def __init__(self, row):
@@ -64,7 +68,9 @@ def get_transcript_combined(transcript):
 
     transcript = transcript.rename(columns={"offer_id": "mapped_offer", "id": "offer_id"})
 
-    return transcript.groupby("person_id").apply(_get_offer_group)
+    transcript = transcript.groupby("person_id").apply(_get_offer_group)
+
+    return transcript
 
 def _get_offer_group(user_group):
     offer_groups = OfferGroups()
