@@ -19,7 +19,7 @@ def clean_profile(profile):
     return profile
 
 EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'offer_completed', 'transaction'], ordered=True)
-OfferIDType = pd.CategoricalDtype(categories=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+OfferIDType = pd.CategoricalDtype(categories=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ordered=True)
 
 def clean_transcript(transcript):
     transcript.event = transcript.event.astype(EventType)
@@ -36,6 +36,8 @@ def clean_transcript_group(transcript_group):
     transcript_group.mapped_offer = transcript_group.mapped_offer.astype(OfferIDType)
     transcript_group.offer_type = transcript_group.offer_type.astype(OfferType)
     transcript_group.gender = transcript_group.gender.astype(GenderType)
+    transcript_group.generation = transcript_group.generation.astype(GenerationType)
+    transcript_group.group = transcript_group.group.astype(AgeGroupType)
 
     return transcript_group
 

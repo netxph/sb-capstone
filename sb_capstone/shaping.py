@@ -2,7 +2,11 @@ import pandas as pd
 import numpy as np
 
 from sb_capstone.wrangling import (
-    tukey_rule 
+    GenerationType,
+    AgeGroupType,
+    OfferIDType,
+    OfferType,
+    GenderType
 )
 
 class OfferGroup():
@@ -70,6 +74,13 @@ def get_transcript_combined(transcript):
 
     transcript = transcript.groupby("person_id").apply(_get_offer_group)
 
+    transcript.mapped_offer = transcript.mapped_offer.astype(OfferIDType)
+
+    transcript = transcript.sort_values(by=["person_id", "time"])
+    transcript["diffs"] = transcript.groupby("person_id").time.diff()
+    transcript = transcript.sort_index()
+    transcript.diffs = transcript.diffs.apply(lambda x: np.NaN if x == 0 else x)
+
     return transcript
 
 def _get_offer_group(user_group):
@@ -128,6 +139,8 @@ def _add_profiles_with_notrans(transcript_group, profile):
             left_on=["id", "wave"], 
             right_on=["person_id", "wave"], 
             how="left")
+
+    transcript_group.gender = transcript_group.gender.astype(GenderType)
 
     return transcript_group
 
@@ -190,6 +203,29 @@ def _explode_membership_date(transcript_group):
 
     return transcript_group
 
+def _extract_age_bins(transcript_group):
+    year = 2018
+
+    transcript_group["generation"] = pd.cut( \
+        transcript_group.age, \
+        bins=[17, year-1997, year-1981, year-1965, year-1946, 101], \
+        labels=["gen_z", "millenials", "gen_x", "boomers", "silent"] \
+    )
+
+    transcript_group.generation = transcript_group.generation.astype(GenerationType)
+
+    transcript_group["group"] = pd.cut(transcript_group.age, bins=[17, 25, 40, 60, 101], labels=["young", "adult", "middle_age", "old"])
+    transcript_group.group = transcript_group.group.astype(AgeGroupType)
+
+    return transcript_group
+
+def _extract_purchased(transcript_group):
+    transcript_group.loc[~transcript_group.received, "purchased"] = transcript_group.non_offer_amount > 0.0
+    transcript_group.loc[transcript_group.received, "purchased"] = transcript_group.viewed & transcript_group.completed
+
+    return transcript_group
+
+
 def get_transcript_group(transcript, profile):
     transcript_group = transcript \
         .sort_values(by=["person_id", "time", "event"]) \
@@ -209,15 +245,20 @@ def get_transcript_group(transcript, profile):
             }) \
         .reset_index()
 
+    transcript_group.offer_type = transcript_group.offer_type.astype(OfferType)
+
     transcript_group = \
         _impute_missing_values(
-            _promote_channels_to_columns(
-                _promote_events_to_columns(
-                    _explode_membership_date(
-                        _add_profiles_with_notrans( \
-                            _remove_transaction_in_event( \
-                                _get_non_offer_amount( \
-                                    _mark_information_completed(transcript_group))), profile)))))
+            _extract_purchased(
+                _extract_age_bins(
+                    _promote_channels_to_columns(
+                        _promote_events_to_columns(
+                            _explode_membership_date(
+                                _add_profiles_with_notrans( \
+                                    _remove_transaction_in_event( \
+                                        _get_non_offer_amount( \
+                                            _mark_information_completed(transcript_group))), profile)))))))
+
 
     
     transcript_group = transcript_group[[
@@ -227,6 +268,7 @@ def get_transcript_group(transcript, profile):
         "received",
         "viewed", 
         "completed",
+        "purchased",
         "amount",
         "reward",
         "non_offer_amount",
@@ -240,6 +282,8 @@ def get_transcript_group(transcript, profile):
         "social",
         "gender",
         "age",
+        "generation",
+        "group",
         "income",
         "membership_year",
         "membership_month",
