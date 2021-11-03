@@ -169,6 +169,9 @@ def _impute_missing_values(transcript_group):
     transcript_group.gender = transcript_group.gender.fillna("U")
     transcript_group.offer_type = transcript_group.offer_type.fillna("no_offer")
 
+    diffs_mean = transcript_group.diffs.mean()
+    transcript_group.diffs = transcript_group.diffs.fillna(diffs_mean)
+
     return transcript_group
 
 def _remove_transaction_in_event(transcript_group):
@@ -201,7 +204,8 @@ def get_transcript_group(transcript, profile):
             "offer_reward": "max",
             "difficulty": "max",
             "duration": "max",
-            "wave": "min"
+            "wave": "min",
+            "diffs": "mean"
             }) \
         .reset_index()
 
@@ -219,6 +223,7 @@ def get_transcript_group(transcript, profile):
     transcript_group = transcript_group[[
         "id",
         "wave",
+        "diffs",
         "received",
         "viewed", 
         "completed",

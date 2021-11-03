@@ -21,7 +21,6 @@ def clean_profile(profile):
 EventType = pd.CategoricalDtype(categories=['offer_received', 'offer_viewed', 'offer_completed', 'transaction'], ordered=True)
 OfferIDType = pd.CategoricalDtype(categories=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
-
 def clean_transcript(transcript):
     transcript.event = transcript.event.astype(EventType)
 
@@ -29,6 +28,9 @@ def clean_transcript(transcript):
     transcript.offer_id = transcript.offer_id.astype(OfferIDType)
 
     return transcript
+
+GenerationType = pd.CategoricalDtype(categories=["gen_z", "millenials", "gen_x", "boomers", "silent"], ordered=True)
+AgeGroupType = pd.CategoricalDtype(categories=["young", "adult", "middle_age", "old"], ordered=True)
 
 def clean_transcript_group(transcript_group):
     transcript_group.mapped_offer = transcript_group.mapped_offer.astype(OfferIDType)
