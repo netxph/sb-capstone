@@ -291,3 +291,70 @@ def get_transcript_group(transcript, profile):
     ]]
 
     return transcript_group
+
+def _convert_gender(gender):
+    if gender == "M":
+        return 1.0
+    elif gender == "F":
+        return 0.0
+    else:
+        return np.NaN
+
+def _transform_bools(transcript_group):
+    transcript_group["received"] = transcript_group["received"].astype(int)
+    transcript_group["viewed"] = transcript_group["viewed"].astype(int)
+    transcript_group["completed"] = transcript_group["completed"].astype(int)
+    transcript_group["purchased"] = transcript_group["purchased"].astype(int)
+    transcript_group["web"] = transcript_group["web"].astype(int)
+    transcript_group["email"] = transcript_group["email"].astype(int)
+    transcript_group["mobile"] = transcript_group["mobile"].astype(int)
+    transcript_group["social"] = transcript_group["social"].astype(int)
+
+    return transcript_group
+
+def _transform_offers(transcript_group):
+
+    offer_dummies = pd.get_dummies(transcript_group.mapped_offer)
+    offer_dummies.columns = offer_dummies.columns.astype(str)
+    transcript_group = transcript_group.drop(columns=["mapped_offer"])
+
+    transcript_group = pd.concat([transcript_group, offer_dummies], axis=1)
+
+    return transcript_group
+
+def _transform_offer_types(transcript_group):
+    offer_type_dummies = pd.get_dummies(transcript_group.offer_type)
+    transcript_group = transcript_group.drop(columns=["offer_type"])
+
+    transcript_group = pd.concat([transcript_group, offer_type_dummies], axis=1)
+
+    return transcript_group
+
+def _transform_gender(transcript_group):
+    transcript_group.gender = transcript_group.gender.apply(_convert_gender)
+
+    return transcript_group
+
+def _transform_generation(transcript_group):
+    gen_dummies = pd.get_dummies(transcript_group.generation)
+    transcript_group = transcript_group.drop(columns=["generation"])
+
+    transcript_group = pd.concat([transcript_group, gen_dummies], axis=1)
+
+    return transcript_group
+
+def _transform_age_group(transcript_group):
+    group_dummies = pd.get_dummies(transcript_group.group)
+    transcript_group = transcript_group.drop(columns=["group"])
+
+    transcript_group = pd.concat([transcript_group, group_dummies], axis=1)
+
+    return transcript_group
+
+def convert_for_training(transcript_group):
+    return _transform_age_group(
+        _transform_generation(
+            _transform_gender(
+                _transform_offer_types(
+                    _transform_offers(
+                        _transform_bools(transcript_group))))))
