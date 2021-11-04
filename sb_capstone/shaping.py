@@ -225,6 +225,12 @@ def _extract_purchased(transcript_group):
 
     return transcript_group
 
+def _extract_offer_spendings(transcript_group):
+    transcript_group["recommended_offer"] = transcript_group.apply(lambda x: 0 if x.purchased == False else x.mapped_offer, axis=1).astype(int)
+    transcript_group["spendings"] = transcript_group.apply(lambda x: x.amount + x.non_offer_amount, axis=1)
+
+    return transcript_group
+
 
 def get_transcript_group(transcript, profile):
     transcript_group = transcript \
@@ -248,16 +254,17 @@ def get_transcript_group(transcript, profile):
     transcript_group.offer_type = transcript_group.offer_type.astype(OfferType)
 
     transcript_group = \
-        _impute_missing_values(
-            _extract_purchased(
-                _extract_age_bins(
-                    _promote_channels_to_columns(
-                        _promote_events_to_columns(
-                            _explode_membership_date(
-                                _add_profiles_with_notrans( \
-                                    _remove_transaction_in_event( \
-                                        _get_non_offer_amount( \
-                                            _mark_information_completed(transcript_group))), profile)))))))
+        _extract_offer_spendings(
+            _impute_missing_values(
+                _extract_purchased(
+                    _extract_age_bins(
+                        _promote_channels_to_columns(
+                            _promote_events_to_columns(
+                                _explode_membership_date(
+                                    _add_profiles_with_notrans( \
+                                        _remove_transaction_in_event( \
+                                            _get_non_offer_amount( \
+                                                _mark_information_completed(transcript_group))), profile))))))))
 
 
     
@@ -273,6 +280,8 @@ def get_transcript_group(transcript, profile):
         "reward",
         "non_offer_amount",
         "mapped_offer",
+        "spendings",
+        "recommended_offer",
         "offer_type",
         "difficulty",
         "duration",
