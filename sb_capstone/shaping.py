@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 
 from sb_capstone.wrangling import (
     GenerationType,
@@ -390,15 +392,23 @@ def _filter_for_receive(transcript_group):
 
     return transcript_group
 
+def _impute_missing(transcript_group):
+
+    imputer = IterativeImputer(initial_strategy="most_frequent")
+    transcript_group = pd.DataFrame(imputer.fit_transform(transcript_group), columns=transcript_group.columns)
+
+    return transcript_group
+
 def convert_for_receive_training(transcript_group):
-    return _select_fields_for_receive(
-        _filter_for_receive(
-            _transform_age_group(
-                _transform_generation(
-                    _transform_gender(
-                        _transform_offer_types(
-                            _transform_offers(
-                                _transform_bools(transcript_group))))))))
+    return _impute_missing(
+        _select_fields_for_receive(
+            _filter_for_receive(
+                _transform_age_group(
+                    _transform_generation(
+                        _transform_gender(
+                            _transform_offer_types(
+                                _transform_offers(
+                                    _transform_bools(transcript_group)))))))))
 
 def get_transcript_offers(transcript_group):
     transcript_group = transcript_group[transcript_group.recommended_offer != 0].groupby("id").agg({
@@ -426,7 +436,7 @@ def _simplify_gender(transcript_group):
 
     transcript_group = transcript_group[transcript_group.gender != "O"].reset_index()
     transcript_group.gender = transcript_group.gender.apply(lambda x: 1 if x == "M" else 0)
-    transcript_group = transcript_group.drop(columns=["index", "id"])
+    transcript_group = transcript_group.drop(columns=["index"])
 
     return transcript_group
 
@@ -436,8 +446,13 @@ def _filter_for_select(transcript_group):
 
     return transcript_group
 
+def _select_fields_for_select(transcript_group):
+    transcript_group = transcript_group.drop(columns=["id"])
+    return transcript_group
+
 def convert_for_select_training(transcript_group):
-    return _dummify_recommended_offer(
-        _simplify_gender(
-            _filter_for_select(
-                get_transcript_offers(transcript_group))))
+    return _select_fields_for_select(
+        _dummify_recommended_offer(
+            _simplify_gender(
+                _filter_for_select(
+                    get_transcript_offers(transcript_group)))))
