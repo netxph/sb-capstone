@@ -1,4 +1,4 @@
-# sb-capstone
+# Starbucks Capstone Challenge
 Starbucks Data Science Capstone Project
 
 ### Table of contents
