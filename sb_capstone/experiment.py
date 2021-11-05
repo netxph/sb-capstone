@@ -1,3 +1,4 @@
+from re import split
 import joblib
 import numpy as np
 import pandas as pd
@@ -6,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
+from sklearn.tree import DecisionTreeClassifier
 
 from sb_capstone.shaping import (
     _simplify_gender,
@@ -36,7 +38,7 @@ def train_receive_offer(data, file):
 
     X_train, X_test, y_train, y_test = train_test_split(X, y)
 
-    clf = KNeighborsClassifier(n_neighbors=5, algorithm="kd_tree", leaf_size=10)
+    clf = DecisionTreeClassifier(criterion="gini", splitter="random")
     clf.fit(X_train, y_train)
 
     y_pred = clf.predict(X_test)
@@ -66,7 +68,7 @@ def train_select_offer(data, file):
     X_train, X_test, y_train, y_test = train_test_split(X, y)
 
     clf = MultiOutputClassifier(
-        KNeighborsClassifier(n_neighbors=5, algorithm="kd_tree", leaf_size=10)
+        DecisionTreeClassifier(criterion="gini", splitter="random"),
     )
 
     clf.fit(X_train, y_train)

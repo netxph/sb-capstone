@@ -68,6 +68,10 @@ Raw data is the only one pushed in the repository, processed files are ignored a
 
 ## Results<a name="results"></a>
 
+The randomized offer experiments did not yield significant results in terms of increasing the response rate. However, the incremental revenue increase when users receive offer, which may conclude that the customer is more likely to spend more when there are offers. Most effective offers are the discount types with medium (10) difficulty. The longer the duration, the better the results.
+
+A way for us to improve the offer targeting is to give out only to customers that are affected by the offer, either through response or through revenue. We provided library that can be used when crafting the next experiment.
+
 Summary of the study results is located under `docs/results.md` file.
 
 ## Licensing, Authors, Acknowledgements<a name="licensing"></a>
