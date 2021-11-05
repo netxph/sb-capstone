@@ -13,8 +13,25 @@ from sb_capstone.wrangling import (
 )
 
 class OfferGroup():
+    """Helper class to store offer groups
+
+    Attributes:
+        offer_id (int): The offer id
+        offer_type (str): The offer type
+        expires (int): The time the offer expires
+        events (list): The events that have been added to the offer group
+        difficulty (float): The difficulty of the offer group
+        redeemed (bool): Whether the offer has been redeemed
+        active (bool): Whether the offer is active
+    """
 
     def __init__(self, row):
+        """Initializes the class
+
+        Args:
+            row (pandas.Series): The row to initialize the class with
+        """
+
         self.offer_id = row.offer_id
         self.offer_type = row.offer_type
         self.expires = (row.duration * 24) + row.time
@@ -24,6 +41,15 @@ class OfferGroup():
         self.active = True
 
     def can_add_event(self, row):
+        """Determines whether the offer group can add an event
+        
+        Args:
+            row (pandas.Series): The row to check
+
+        Returns:
+            bool: Whether the offer group can add the event
+        """
+
         if row.event != "transaction":
             return (row.offer_id == self.offer_id) and  \
                 (not row.event in self.events)
@@ -31,6 +57,15 @@ class OfferGroup():
             return (row.time <= self.expires) and (not self.redeemed) and (self.active)
 
     def add_event(self, row):
+        """Adds an event to the offer group
+
+        Args:
+            row (pandas.Series): The row event to add
+
+        Returns:
+            None
+        """
+
         if row.event != "transaction":
             self.events.append(row.event)
         else:
@@ -38,15 +73,38 @@ class OfferGroup():
             self.redeemed = self.difficulty <= 0.0
 
     def deactivate(self):
+        """Deactivates the offer group
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self.active = False
 
 class OfferGroups():
+    """Helper class to store offer groups
+    """
 
     def __init__(self):
+        """Initializes the class
+        """
+
         self._groups = {}
         self._index = 0
 
     def get_group(self, row):
+        """Returns the group that the row event belongs to
+
+        Args:
+            row (pandas.Series): The row event to add
+
+        Returns:
+            None
+        """
+
         # there should have only one unique event per group
         result = -row.wave, 0
 
@@ -60,6 +118,15 @@ class OfferGroups():
         return result
 
     def add_group(self, row):
+        """Adds a new group to the offer groups
+
+        Args:
+            row (pandas.Series): The row event to add
+
+        Returns:
+            None
+        """
+
         # create a new group, initializing all variables
 
         for g in self._groups:
@@ -70,6 +137,15 @@ class OfferGroups():
 
 
 def get_transcript_combined(transcript):
+    """Gets an enriched transcript with new features
+
+    Args:
+        transcript(pandas.DataFrame): The transcript table to transform
+
+    Returns:
+        pandas.DataFrame: The enriched transcript
+    """
+    
     transcript["wave"] = pd.cut(transcript.time, bins=[-1, 167, 335, 407, 503, 575, 714], labels=np.arange(1,7))
     transcript["day"] = pd.cut(transcript.time, bins=np.arange(-1, 714 + 24, step=24), labels=np.arange(1, 30 + 1))
 
@@ -87,6 +163,15 @@ def get_transcript_combined(transcript):
     return transcript
 
 def _get_offer_group(user_group):
+    """Gets the offer group object
+
+    Args:
+        user_group (pandas.DataFrame): The user group to get the offer group for
+
+    Returns:
+        pandas.DataFrame: The enriched offer group
+    """
+
     offer_groups = OfferGroups()
 
     for i, row in user_group.iterrows():
@@ -101,6 +186,15 @@ def _get_offer_group(user_group):
     return user_group
 
 def _mark_information_completed(transcript_group):
+    """Marks whether the offer event is completed properly on informational offers
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript group to mark
+
+    Returns:
+        pandas.DataFrame: The modified transcript with updated informational event
+    """
+
     mask = transcript_group.event.fillna("").apply(lambda x: "transaction" in x)
 
     transcript_group.loc[(transcript_group.offer_type == "informational") & mask, "event"] = \
@@ -111,6 +205,15 @@ def _mark_information_completed(transcript_group):
     return transcript_group
 
 def _get_non_offer_amount(transcript_group):
+    """Extracts the amount not related to offer
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript group to extract the amount from
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the non-offer related amount
+    """
+
     transcript_non_offer = transcript_group[transcript_group.offer_group < 0] \
         [["person_id", "wave", "amount"]]   \
             .reset_index(drop=True).rename(columns={"amount": "non_offer_amount"})
@@ -127,6 +230,16 @@ def _get_non_offer_amount(transcript_group):
     return transcript_group
 
 def _add_profiles_with_notrans(transcript_group, profile):
+    """Attach customer profile to transcript
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript group to attach the profile to
+        profile (pandas.DataFrame): The customer profile to attach
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the profile attached
+    """
+
     waves = []
 
     for i in transcript_group.wave.unique():
@@ -148,6 +261,15 @@ def _add_profiles_with_notrans(transcript_group, profile):
     return transcript_group
 
 def _promote_events_to_columns(transcript_group):
+    """Promote the events values as columns
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the events promoted as columns
+    """
+
     transcript_group["received"] = transcript_group.event \
         .fillna("") \
         .apply(lambda x: x[0] == "offer_received" if len(x) > 0 else False)
@@ -161,6 +283,15 @@ def _promote_events_to_columns(transcript_group):
     return transcript_group
 
 def _promote_channels_to_columns(transcript_group):
+    """Promote the channels values as columns
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the channels promoted as columns
+    """
+
     transcript_group \
         .loc[~transcript_group.channels.isna(), ["web", "email", "mobile", "social"]] =  \
             transcript_group \
@@ -172,6 +303,15 @@ def _promote_channels_to_columns(transcript_group):
     return transcript_group
 
 def _impute_missing_values(transcript_group):
+    """Impute the missing values
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the missing values imputed
+    """
+
     transcript_group.amount = transcript_group.amount.fillna(0)
     transcript_group.reward = transcript_group.reward.fillna(0)
     transcript_group.non_offer_amount = transcript_group.non_offer_amount.fillna(0)
@@ -191,6 +331,14 @@ def _impute_missing_values(transcript_group):
     return transcript_group
 
 def _remove_transaction_in_event(transcript_group):
+    """Removes the transaction in the list of events
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the transaction removed
+    """
 
     transcript_group.event = transcript_group.event \
         .apply(lambda x: list(filter(lambda a: a != "transaction", x)) if x != np.NaN else [])
@@ -198,6 +346,15 @@ def _remove_transaction_in_event(transcript_group):
     return transcript_group
 
 def _explode_membership_date(transcript_group):
+    """Splits the membership date into year, month and day
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the membership date exploded
+    """
+
     transcript_group["membership_year"] = transcript_group.became_member_on.dt.year
     transcript_group["membership_month"] = transcript_group.became_member_on.dt.month
     transcript_group["membership_day"] = transcript_group.became_member_on.dt.day
@@ -207,6 +364,15 @@ def _explode_membership_date(transcript_group):
     return transcript_group
 
 def _extract_age_bins(transcript_group):
+    """Extracts generation and age group from age
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the age bins extracted
+    """
+
     year = 2018
 
     transcript_group["generation"] = pd.cut( \
@@ -223,12 +389,30 @@ def _extract_age_bins(transcript_group):
     return transcript_group
 
 def _extract_purchased(transcript_group):
+    """Extracts the purchased column
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the purchased column extracted
+    """
+
     transcript_group.loc[~transcript_group.received, "purchased"] = transcript_group.non_offer_amount > 0.0
     transcript_group.loc[transcript_group.received, "purchased"] = transcript_group.viewed & transcript_group.completed
 
     return transcript_group
 
 def _extract_offer_spendings(transcript_group):
+    """Extracts the spendings per customer
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+    
+    Returns:
+        pandas.DataFrame: The modified transcript with the spendings per customer extracted
+    """
+
     transcript_group["recommended_offer"] = transcript_group.apply(lambda x: 0 if x.purchased == False else x.mapped_offer, axis=1).astype(int)
     transcript_group["spendings"] = transcript_group.apply(lambda x: x.amount + x.non_offer_amount, axis=1)
 
@@ -236,6 +420,16 @@ def _extract_offer_spendings(transcript_group):
 
 
 def get_transcript_group(transcript, profile):
+    """Flattens the transcript dataset and extracts features
+
+    Args:
+        transcript (pandas.DataFrame): The transcript dataset
+        profile (pandas.DataFrame): The profile dataset
+
+    Returns:
+        pandas.DataFrame: The flattened transcript dataset
+    """
+
     transcript_group = transcript \
         .sort_values(by=["person_id", "time", "event"]) \
         .groupby(["person_id", "offer_group"]) \
@@ -305,6 +499,15 @@ def get_transcript_group(transcript, profile):
     return transcript_group
 
 def _convert_gender(gender):
+    """Helper method to transform gender
+
+    Args:
+        gender(str): The gender
+
+    Returns:
+        float: The converted value.
+    """
+
     if gender == "M":
         return 1.0
     elif gender == "F":
@@ -313,6 +516,15 @@ def _convert_gender(gender):
         return np.NaN
 
 def _transform_bools(transcript_group):
+    """Transform booleans to integers
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the booleans transformed
+    """
+
     transcript_group["received"] = transcript_group["received"].astype(int)
     transcript_group["viewed"] = transcript_group["viewed"].astype(int)
     transcript_group["completed"] = transcript_group["completed"].astype(int)
@@ -325,6 +537,14 @@ def _transform_bools(transcript_group):
     return transcript_group
 
 def _transform_offers(transcript_group):
+    """Transform offers to dummies
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the offers transformed
+    """
 
     offer_dummies = pd.get_dummies(transcript_group.mapped_offer)
     offer_dummies.columns = offer_dummies.columns.astype(str)
@@ -335,6 +555,15 @@ def _transform_offers(transcript_group):
     return transcript_group
 
 def _transform_offer_types(transcript_group):
+    """Transform offer types to dummies
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the offer types transformed
+    """
+
     offer_type_dummies = pd.get_dummies(transcript_group.offer_type)
     transcript_group = transcript_group.drop(columns=["offer_type"])
 
@@ -343,11 +572,29 @@ def _transform_offer_types(transcript_group):
     return transcript_group
 
 def _transform_gender(transcript_group):
+    """Transform gender for model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the gender transformed
+    """
+
     transcript_group.gender = transcript_group.gender.apply(_convert_gender)
 
     return transcript_group
 
 def _transform_generation(transcript_group):
+    """Transform generation to dummies
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the generation transformed
+    """
+
     gen_dummies = pd.get_dummies(transcript_group.generation)
     transcript_group = transcript_group.drop(columns=["generation"])
 
@@ -356,6 +603,15 @@ def _transform_generation(transcript_group):
     return transcript_group
 
 def _transform_age_group(transcript_group):
+    """Transform age group to dummies
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the age group transformed
+    """
+
     group_dummies = pd.get_dummies(transcript_group.group)
     transcript_group = transcript_group.drop(columns=["group"])
 
@@ -364,6 +620,15 @@ def _transform_age_group(transcript_group):
     return transcript_group
 
 def _select_fields_for_receive(transcript_group):
+    """Selects only the fields for receive model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the fields for receive model training
+    """
+
     cols = [
         "purchased",
         "gender",
@@ -388,11 +653,28 @@ def _select_fields_for_receive(transcript_group):
     return transcript_group
 
 def _filter_for_receive(transcript_group):
+    """Remove the data that we are not going to use.
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with rows filtered
+    """
+
     transcript_group = transcript_group[~transcript_group.age.isna() & transcript_group.received]
 
     return transcript_group
 
 def _impute_missing(transcript_group):
+    """Impute missing values
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with missing imputed.
+    """
 
     imputer = IterativeImputer(initial_strategy="most_frequent")
     transcript_group = pd.DataFrame(imputer.fit_transform(transcript_group), columns=transcript_group.columns)
@@ -400,6 +682,15 @@ def _impute_missing(transcript_group):
     return transcript_group
 
 def convert_for_receive_training(transcript_group):
+    """Convert the transcript dataset for the receive model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the features for receive model training
+    """
+
     return _impute_missing(
         _select_fields_for_receive(
             _filter_for_receive(
@@ -411,6 +702,15 @@ def convert_for_receive_training(transcript_group):
                                     _transform_bools(transcript_group)))))))))
 
 def get_transcript_offers(transcript_group):
+    """Flatten the transcript further to get only the successful offers.
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+    
+    Returns:
+        pandas.DataFrame: The modified transcript with the offers flattened
+    """
+
     transcript_group = transcript_group[transcript_group.recommended_offer != 0].groupby("id").agg({
         "recommended_offer": lambda x: list(dict.fromkeys(x.tolist())),
         "gender": "first",
@@ -424,6 +724,14 @@ def get_transcript_offers(transcript_group):
     return transcript_group
 
 def _dummify_recommended_offer(transcript_group):
+    """Convert recommended offer to dummies
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the recommended offer transformed
+    """
 
     offers = pd.get_dummies(transcript_group.recommended_offer.explode()).groupby(level=0).sum()
     offers.columns = offers.columns.astype(str)
@@ -433,6 +741,14 @@ def _dummify_recommended_offer(transcript_group):
     return transcript_group
 
 def _simplify_gender(transcript_group):
+    """Simplify gender column for training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with gender data simplified.
+    """
 
     transcript_group = transcript_group[transcript_group.gender != "O"].reset_index()
     transcript_group.gender = transcript_group.gender.apply(lambda x: 1 if x == "M" else 0)
@@ -441,16 +757,43 @@ def _simplify_gender(transcript_group):
     return transcript_group
 
 def _filter_for_select(transcript_group):
+    """Filter the records that we'll be using for the select model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the records filtered
+    """
+
     transcript_group = transcript_group[~transcript_group.age.isna()]
     transcript_group = tukey_rule(transcript_group, "income")
 
     return transcript_group
 
 def _select_fields_for_select(transcript_group):
+    """Select the fields for the select model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the fields for select model training
+    """
+
     transcript_group = transcript_group.drop(columns=["id"])
     return transcript_group
 
 def convert_for_select_training(transcript_group):
+    """Convert data for the select model training
+
+    Args:
+        transcript_group (pandas.DataFrame): The transcript dataset
+
+    Returns:
+        pandas.DataFrame: The modified transcript with the features for select model training
+    """
+
     return _select_fields_for_select(
         _dummify_recommended_offer(
             _simplify_gender(

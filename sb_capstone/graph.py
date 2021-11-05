@@ -3,6 +3,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def plot_corr(corr):
+    """Helper to create a correlation graph
+
+    Args:
+        corr (DataFrame): Correlation matrix
+
+    Returns:
+        None
+    """
+
     mask = np.triu(np.ones_like(corr, dtype=bool))
     f, ax = plt.subplots(figsize=(16, 12))
     cmap = sns.diverging_palette(230, 20, as_cmap=True)
