@@ -6,7 +6,8 @@ from sb_capstone.wrangling import (
     AgeGroupType,
     OfferIDType,
     OfferType,
-    GenderType
+    GenderType,
+    tukey_rule
 )
 
 class OfferGroup():
@@ -360,10 +361,83 @@ def _transform_age_group(transcript_group):
 
     return transcript_group
 
-def convert_for_training(transcript_group):
-    return _transform_age_group(
-        _transform_generation(
-            _transform_gender(
-                _transform_offer_types(
-                    _transform_offers(
-                        _transform_bools(transcript_group))))))
+def _select_fields_for_receive(transcript_group):
+    cols = [
+        "purchased",
+        "gender",
+        "age",
+        "income",
+        "membership_year",
+        "membership_month",
+        "membership_day",
+        "gen_z",
+        "millenials",
+        "gen_x",
+        "boomers",
+        "silent",
+        "young",
+        "adult",
+        "middle_age",
+        "old"
+    ]
+
+    transcript_group = transcript_group[cols]
+
+    return transcript_group
+
+def _filter_for_receive(transcript_group):
+    transcript_group = transcript_group[~transcript_group.age.isna() & transcript_group.received]
+
+    return transcript_group
+
+def convert_for_receive_training(transcript_group):
+    return _select_fields_for_receive(
+        _filter_for_receive(
+            _transform_age_group(
+                _transform_generation(
+                    _transform_gender(
+                        _transform_offer_types(
+                            _transform_offers(
+                                _transform_bools(transcript_group))))))))
+
+def get_transcript_offers(transcript_group):
+    transcript_group = transcript_group[transcript_group.recommended_offer != 0].groupby("id").agg({
+        "recommended_offer": lambda x: list(dict.fromkeys(x.tolist())),
+        "gender": "first",
+        "age": "max",
+        "income": "max",
+        "membership_year": "max",
+        "membership_month": "max",
+        "membership_day": "max"
+    }).reset_index()
+
+    return transcript_group
+
+def _dummify_recommended_offer(transcript_group):
+
+    offers = pd.get_dummies(transcript_group.recommended_offer.explode()).groupby(level=0).sum()
+    offers.columns = offers.columns.astype(str)
+
+    transcript_group = pd.concat([transcript_group, offers], axis=1).drop(columns="recommended_offer")
+
+    return transcript_group
+
+def _simplify_gender(transcript_group):
+
+    transcript_group = transcript_group[transcript_group.gender != "O"].reset_index()
+    transcript_group.gender = transcript_group.gender.apply(lambda x: 1 if x == "M" else 0)
+    transcript_group = transcript_group.drop(columns=["index", "id"])
+
+    return transcript_group
+
+def _filter_for_select(transcript_group):
+    transcript_group = transcript_group[~transcript_group.age.isna()]
+    transcript_group = tukey_rule(transcript_group, "income")
+
+    return transcript_group
+
+def convert_for_select_training(transcript_group):
+    return _dummify_recommended_offer(
+        _simplify_gender(
+            _filter_for_select(
+                get_transcript_offers(transcript_group))))
