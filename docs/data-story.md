@@ -163,15 +163,15 @@ To be able to perform our analysis effectively, we need to shape our data and en
 
 While the transcript is in running time format, it'll be good to compress and flatten them to summarize what happened per offer group and customer. Since the duration of offer is not uniform, we observed, that the latest offer replaces the old one as the active offer. Also we've learned that only one offer per customer are given per wave. This is where the complex transformation comes in, which required me to create a little logic behind transformation to achieve this one. In the end I was able to flatten the transcript with the following new features.
 
-* wave - the current wave for an offer
-* diffs - the average time difference in between events. This will be handful later when designing an offer.
+* wave - the current wave for an offer. This is captured by getting the date range of in between offer received events and numbered them from 1-6. All events in between those date range are set with the corresponding wave number.
+* diffs - the average time difference in between events. This will be handful later when designing an offer. This was taken by performing a running diff on a sorted time data group per customer. The first event is always 0, therefore, to normalize the mean difference in the flatten format, the first one's value is replaced by the mean of the diffs.
 * received, viewed, completed - they are now columns with bool values when these events are met. Viewed are discarded if they are done after the offer is completed, therefore set to false.
 * purchased - it's a bool summary if the customer has received, viewed and completed the offer, thus a successful offer.
-* amount - this is now sum amount spent related to offer
-* non_offer_amount - this is the sum amount spent not related to offer
-* mapped_offer - based on our understanding of how transcript works, we have able to successfully map the offer to any events.
+* amount - this is now sum amount spent related to offer. This is calculated by getting all the transactions needed to complete the offer. Then getting the sum of that transaction.
+* non_offer_amount - this is the sum amount spent not related to offer. This is the sum of all other transactions if there are no active offers or the current offer is already been completed.
+* mapped_offer - based on our understanding of how transcript works, we have able to successfully map the offer to any events. This is the active offer on the current wave.
 * spendings - amount + non-offer amount, sums up the amount spent on each waves
-* recommended_offer - the offer id only if the offer is successful (purchased=true)
+* recommended_offer - the offer ids only if the offer is successful (purchased=true)
 
 Aside from these, portfolio and profile dataset are also merged with this dataset. The entire transcript is right merged with the profile dataset to capture those who are not given any offer and didn't do anything during those wave period.
 
@@ -496,13 +496,25 @@ For the first part, we only need data that relates to the customer, which is the
 
 It is useless to add the anonymous customers in our training data, as we don't have any distinguishing information from them that may influence the effect of the promotion. With that, we are going to remove them from our training data. Aside from that, we will further filter the data for those who received the offer only and how they reacted to it. This way we'll know if effective or not. We are also going to extract additional information to enrich our training model such as the age groups and generation.
 
+**Steps**
+
+1. Load the summarized transcript (`transcript_group.csv`). Refer to the "Enriching our Data" section above for the feature engineered details.
+2. Remove anonymous customer with no age, income and gender (`transcript_group.age.isna()`). These information are what we are going to rely on in training the model.
+3. Remove also those who did not receive the offer (`transcript_group.received == False`). They didn't have any interaction with the offers, therefore we will never know how they reacted to the offer.
+4. We are going to simplify the `gender` as `1` if male and `0` if female. However, there are around 200 that have other as gender. We are going to use **Multivariate Imputation by Chained Equation** in imputing those genders. This technique tries to look for the best prediction from other columns to fill out the missing value.
+5. Remove outliers in income using tukey rule.
+6. Select fields `purchased`, `gender`, `age`, `income`, `membership_year`, `membership_month`, `membership_day`, `generation` and `age_group`.
+7. Dummify `generation` and `age_group`
+
 After all these are done, we are going to dummify categorical variables and prepare for training.
 
 ![receive-corr](./receive-corr.png)
 
 #### Model Training
 
-We are going to use a binary classification for this one using `purchased` as response variable. For the algorithms, we tried out a bunch, but to limit it to top 3 we selected `LogisticRegression`, `DecisionTreeClassifier` and `KNeighborsClassifier`. We are going to feed them for hyper parameter tuning to find out the best parameters for our training model.
+We are going to use a binary classification for this one using `purchased` as response variable. For the algorithms, we tried out a bunch, but to limit it to top 3 we selected `LogisticRegression`, `DecisionTreeClassifier` and `KNeighborsClassifier`. As we are still trying to find out the best algorithm to use, we are going to use their default parameter settings. 
+
+We are going to feed them for hyper parameter tuning to find out the best parameters for our training model.
 
 **Metrics**
 
@@ -514,12 +526,12 @@ We'd like to have a balance between precision and recall, as this is only for ex
 | ------------------ | --------------------- | -------------------- |
 | 0.467353           | 0.608990              | 0.596040             |
 
-Selecting **DecisionTreeClassifier**, I further tried to perform tuning and able to improve the result a little. The resulting best parameters are:
+Selecting **DecisionTreeClassifier**, I further tried to perform tuning and able to improve the result a little. The resulting best parameters (in bold) are:
 
-* class_weight: None
-* criterion: entropy
-* max_features: None
-* splitter: best
+* class_weight: [**None**, balanced]
+* criterion: [gini, **entropy**]
+* max_features: [auto, sqrt, log2, **None**]
+* splitter: [**best**, random]
 
 The weighted average f1-score is **0.6100730914664464**.
 
@@ -537,6 +549,16 @@ Examining the current data that we have, this can be answered by creating a reco
 
 Before we can proceed with the training, we need to flatten further our training group dataset and extract only the successful offers per customer. This data will serve as our response variable. In out dataset, all unsuccessful and no offers received are removed since we are no longer going to use them.
 
+**Steps**
+
+1. Load the summarized transcript (`transcript_group.csv`). Refer to the "Enriching our Data" section above for the feature engineered details.
+2. Remove anonymous customer with no age, income and gender (`transcript_group.age.isna()`). These information are what we are going to rely on in training the model.
+3. Remove all transactions that did not receive any offer (`transcript_group.received == False`)
+4. Remove all unsuccessful offers, we are only interested on the successful ones (`transcript_group.purchased == False`)
+5. Simplify gender, using 1 for male and 0 for female. Use MICE again for imputing the "others" data.
+6. Flatten the data by grouping using person id and wave id as keys. Implode the successful offers into an array column (`recommended_offers`), and the rest get the following fields: `gender`, `age`, `income`, `membership_year`, `membership_month`, `membership_day`.
+7. Dummify `recommended_offers`
+
 Here's the distribution of offers after cleaning.
 
 ![select-dist](./select-dist.png)
@@ -551,7 +573,9 @@ After cleaning, we are going to dummify all categorical variables and prepare fo
 
 #### Model Training
 
-We are going to perform multi-output classification, and again algorithms are pre-selected for those in the top 3. We've chosen `KNeighborsClassifier`, `DecisionTreeClassifier` and `ExtraTreeClassifier` as estimators for our `MultiOutputClassifier`. For the data, we need `y` to be dummified recommended offers, while `X` are customer features.
+We are going to perform multi-output classification, and again algorithms are pre-selected for those in the top 3. We've chosen `KNeighborsClassifier`, `DecisionTreeClassifier` and `ExtraTreeClassifier` as estimators for our `MultiOutputClassifier`.  For these models, as we are still trying to select the best one, we are going to use their default parameters. Since these are straightforward model training, no issues found when coding and training the model.
+
+For the data, we need `y` to be dummified recommended offers, while `X` are customer features.
 
 **Metrics**
 
@@ -565,10 +589,10 @@ Again, these are for experiments, and we'd like to have a balance between precis
 
 Again, **DecisionTreeClassifier** won this round. I further tune it, but got only very little improvement. The resulting best parameters are:
 
-* class_weight: None
-* criterion: entropy
-* max_features: None
-* splitter: best
+* class_weight: [**None**, balanced]
+* criterion: [gini, **entropy**]
+* max_features: [auto, sqrt, log2, **None**]
+* splitter: [**best**, random]
 
 The weighted average f1-score is **0.2560590665020447**
 
@@ -584,6 +608,32 @@ On this round, **DecisionTreeClassifier** won followed by **ExtraTreeClassifier*
 
 Your third coffee might be halfway done by now. We learned a lot of things in this study.
 
+### Reflection
+
+The project is about applying the data science process on the data provided by Starbucks. Because of this project, I am able to expand my knowledge even beyond to what I learned from Udacity's Data Science Nanodegree program. I am able to craft my own workflow process that I will call my own.
+
+**Project Structure**
+
+The first that I am proud of is I am able to create my own project structure that is easy to work on. I am able to organize my notebooks, data and models. Aside from that, I found a way that I no longer worry about how to access my codes, by converting the entire project into an installable pip library.
+
+**Pre-Processing**
+
+Right out of the bat, I am faced with challenges on how to deal with `json` as I am more used to working with `csv` files. Then, another weird thing is that the ids are all in `GUID`. My experience with SQL helps me craft how I can replace the values of portfolio, profile and transcript ids from `GUID` to integer.
+
+**Data Understanding**
+
+With not so much of documentation about the data, this is where I spent most of my time in doing the project, understanding the data especially the transcript dataset, looking for patterns that I will need to use to get the data I want. There's also no direct mapping of SQL to transform the data, I pulled out all my skills in software development to create a custom code just to transform the data. I even made it sort of OOP (Object Oriented Programming) style to reduce complexities.
+
+**Experiment Testing**
+
+This is where I struggled the most. The lesson I learned from Udacity is specific only to a certain problem, that when I have situations different to what they taught me, I don't know how to tweak it since I don't have any heavy statistics background. Luckily I came across some different resources that simplifies my understanding.
+
+**Model Training**
+
+Getting frustrated from low performance of the model, I spent days trying to research how further improve the models, but unfortunately, the limited data forced me to accept their current low performance. I tried performing feature engineering by getting the amount spent by each customer and during training, I created a model to predict the amount the the customer will spent. However, it just made the model performance worst, so I didn't include that in this study.
+
+### Summary of Findings
+
 * As you grow older, the love for coffee becomes unconditional, whether there are offers or not. As majority of our customers are at the boomers or middle age, we can see that offers won't affect the response rate of the customers. However, there are still other customers in the age group that are affected, which maybe we can handpicked specifically in our next experiment
 * Offers may not improve the response rate, however, it does push customers to spend more. As a customer myself, drinking coffee is also contagious that simply pulling in people in the store, we encourage other customers to buy drink, or to buy drink for someone else. Offers have that effect, and during promotions, these maybe the times that we feel generous.
 * Buy-one-get-one may sound appealing to some, the effect is not that much for coffee drinkers based on the study we performed. The best offers are the discount types that are easy to avail of and the worst one are those with difficulty that are super high.
@@ -592,6 +642,14 @@ Your third coffee might be halfway done by now. We learned a lot of things in th
 And this is the end of my journey in this study. This could be much easier if you statistics background. However, as most new learnings, we got to start somewhere and various libraries really help me calculate complex formulas. I posted links below and some of them helped me to select the best algorithm and find out the libraries I need to execute the things I want. I hope they can help you too.
 
 And, lastly, the format of this blog is somehow close to CRISP-DM methodology, but this is blown up in detail in my project space. Be sure to check it out [here](https://github.com/netxph/sb-capstone).
+
+### Improvement
+
+Relying to just the 3 features, age, gender and income is not enough to get a good performing model. My recommendation is to work on getting additional features from customer either giving out bonus points to the customer if he completes his profile, or send out survey in exchange for rewards.
+
+Another thing for the next experiment is to add more either new offerings or flexible offerings where we can tweak reward, difficulty and duration based on the customer we are targeting.
+
+It would be nice also for the transcript if we could add like the actual days or days of week for us to find out if the customer is building a habit or not. Another feature that is worth getting is the product they are getting and the size. These new features will move us closer in creating customer segmentation.
 
 
 
