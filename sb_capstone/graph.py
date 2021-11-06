@@ -22,6 +22,14 @@ def plot_corr(corr):
 
 
 def get_cv_results(cv):
+    """Helper to transform a cross validation results into a dataframe
+
+    Args:
+        cv (sklearn.model_selection.cross_validate): Cross validation results
+
+    Returns:
+        DataFrame: Cross validation results
+    """
     
     results = [[list(cv.cv_results_["params"][i].values()), cv.cv_results_["mean_test_score"][i]] for i in range(len(cv.cv_results_["params"]))]
     results = pd.DataFrame(results, columns=["params", "score"])
