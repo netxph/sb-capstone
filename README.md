@@ -72,7 +72,7 @@ The randomized offer experiments did not yield significant results in terms of i
 
 A way for us to improve the offer targeting is to give out only to customers that are affected by the offer, either through response or through revenue. We provided library that can be used when crafting the next experiment.
 
-Summary of the study results is located under `docs/results.md` file.
+Summary of the study results is located under `docs/data-story.md` file.
 
 ## Licensing, Authors, Acknowledgements<a name="licensing"></a>
 
