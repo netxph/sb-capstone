@@ -80,7 +80,7 @@ _Age Group:_
 _Generations:_
 
 * 17-21: Generation Z
-* 22-37: Millenials
+* 22-37: Millennials
 * 38-53: Generation X
 * 54-72: Boomers
 * 73-101: Silent
@@ -120,7 +120,7 @@ As these event also represents the lifecycle of customer purchase, we can see th
 
 ![events](./events.png)
 
-With these events and information gained, we are able to compress and summarize the transcript and find out the success rate of prpmotions. Compressing them will have the following four outcomes.
+With these events and information gained, we are able to compress and summarize the transcript and find out the success rate of promotions. Compressing them will have the following four outcomes.
 
 * successful
    - the offer was received, viewed and completed
@@ -331,7 +331,7 @@ In summary, we do have only one clear winner to answer the question and that is 
 More spending means more revenue. However, we need to put into account the amount we are losing by giving rewards and sending the offers. Since we don't have a good balance between treatment and control, we are going to make use of individual revenue rate instead. The revenue are computed differently between treatment and control group.
 
 $$
-rev_{tr} = amt_{tr} - rwd_{tr} - ((ch_{email} + ch_{web} + ch_{mobile} + ch_{social}) * 0.15) 
+rev_{tr} = amt_{tr} - rwd_{tr} - ((ch_{email} + ch_{web} + ch_{mobile} + ch_{social}) * 0.15)
 $$
 
 $$
@@ -370,7 +370,7 @@ Type: Upper Tailed T-Test
 Hypothesis:
 
 $$
-H_0: \bar{X}_{tr} - \bar{X}_{ct} \leq 0 
+H_0: \bar{X}_{tr} - \bar{X}_{ct} \leq 0
 $$
 $$
 H_1: \bar{X}_{tr} - \bar{X}_{ct} > 0
