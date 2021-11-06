@@ -506,8 +506,6 @@ It is useless to add the anonymous customers in our training data, as we don't h
 6. Select fields `purchased`, `gender`, `age`, `income`, `membership_year`, `membership_month`, `membership_day`, `generation` and `age_group`.
 7. Dummify `generation` and `age_group`
 
-After all these are done, we are going to dummify categorical variables and prepare for training.
-
 ![receive-corr](./receive-corr.png)
 
 #### Model Training
@@ -587,7 +585,7 @@ Again, these are for experiments, and we'd like to have a balance between precis
 | -------------------- | ---------------------- | ------------------- |
 | 0.146817             | 0.253306               | 0.243753            |
 
-Again, **DecisionTreeClassifier** won this round. I further tune it, but got only very little improvement. The resulting best parameters are:
+Again, **DecisionTreeClassifier** won this round. I further tune it, but got only very little improvement. The resulting best parameters (in bold) are:
 
 * class_weight: [**None**, balanced]
 * criterion: [gini, **entropy**]
